@@ -5,137 +5,174 @@ export default function App() {
   const [cv, setCv] = useState(null);
   const [cover, setCover] = useState(null);
   const [url, setUrl] = useState("");
-  const [result, setResult] = useState(null);
-  const [raw, setRaw] = useState(null);
+  const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const analyze = async () => {
     if (!cv || !cover || !url) {
-      alert("Upload CV, Cover Letter and URL");
+      setError("Please upload CV, cover letter, and job URL");
       return;
     }
 
-    const form = new FormData();
-    form.append("cv", cv);
-    form.append("cover_letter", cover);
-    form.append("url", url);
-
     setLoading(true);
-    setResult(null);
-    setRaw(null);
+    setError("");
 
     try {
+      const form = new FormData();
+      form.append("cv", cv);
+      form.append("cover_letter", cover);
+      form.append("url", url);
+
       const res = await axios.post(
         "http://127.0.0.1:5000/api/analyze-cv",
         form
       );
 
-      const data = res.data.result;
-
-      // 🔥 Handle error case
-      if (data?.error) {
-        setRaw(data.raw);
-      }
-
-      setResult(data);
+      setData(res.data.result);
     } catch (err) {
-      console.log(err);
-      alert(err.response?.data?.message || "Network error");
+      setError("API request failed");
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
-  const safe = (arr) => (Array.isArray(arr) ? arr : []);
-
-  const cleanText = (text) =>
-    typeof text === "string" ? text.replace(/<think>[\s\S]*?<\/think>/g, "") : "";
-
-  const r = result || {};
-  const cvA = r.cv_analysis || {};
-  const coverA = r.cover_letter_analysis || {};
-  const jobA = r.job_alignment || {};
+  const d = data || {};
+  const cvA = d.cv_analysis || {};
+  const coverA = d.cover_letter || {};
+  const jobA = d.job_analysis || {};
 
   return (
     <div style={styles.page}>
-      <h1 style={styles.title}>🚀 AI CV Analyzer</h1>
+      <div style={styles.container}>
+        <h1>🚀 AI CV Dashboard</h1>
 
-      {/* INPUT */}
-      <div style={styles.card}>
-        <input type="file" onChange={(e) => setCv(e.target.files[0])} />
-        <input type="file" onChange={(e) => setCover(e.target.files[0])} />
+        {/* INPUT */}
+        <div style={styles.card}>
+          <div style={styles.inputGroup}>
+            <label style={styles.label}>📄 Upload CV</label>
+            <input
+              type="file"
+              onChange={(e) => setCv(e.target.files[0])}
+              style={styles.input}
+            />
+          </div>
 
-        <input
-          placeholder="Job URL"
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          style={styles.input}
-        />
+          <div style={styles.inputGroup}>
+            <label style={styles.label}>✉️ Upload Cover Letter</label>
+            <input
+              type="file"
+              onChange={(e) => setCover(e.target.files[0])}
+              style={styles.input}
+            />
+          </div>
 
-        <button onClick={analyze} style={styles.button}>
-          {loading ? "Analyzing..." : "Analyze"}
-        </button>
-      </div>
+          <div style={styles.inputGroup}>
+            <label style={styles.label}>🔗 Enter Job URL</label>
+            <input
+              type="text"
+              placeholder="https://..."
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              style={styles.textInput}
+            />
+          </div>
 
-      {/* RESULT */}
-      {result && (
-        <div style={styles.result}>
-          <h2>📊 Result</h2>
+          <button
+            onClick={analyze}
+            style={styles.button}
+            onMouseOver={(e) =>
+              (e.target.style.opacity = "0.9")
+            }
+            onMouseOut={(e) =>
+              (e.target.style.opacity = "1")
+            }
+          >
+            {loading ? "Analyzing..." : "Analyze"}
+          </button>
 
-          <h3>Match Score: {r.match_score || "N/A"}</h3>
+          {error && <p style={styles.error}>{error}</p>}
+        </div>
 
-          {/* CV */}
-          <Section title="CV Missing Keywords" items={safe(cvA.missing_keywords)} />
-          <Section title="Skills to Add" items={safe(cvA.skills_to_add)} />
-          <Section title="ATS Tips" items={safe(cvA.ats_tips)} />
+        {/* DASHBOARD */}
+        {data && (
+          <div style={styles.dashboard}>
+            {/* CV SECTION */}
+            <h2 style={{ marginTop: "10px", fontWeight: 600 }}>
+              📊 CV Analysis
+            </h2>
 
-          {/* Cover Letter */}
-          <Section title="Cover Letter Issues" items={safe(coverA.issues)} />
-          <Section title="Improvements" items={safe(coverA.improvements)} />
+            <h3>Match Score: {cvA.match_score || "N/A"}</h3>
 
-          {/* Job */}
-          <Section title="Job Strengths" items={safe(jobA.strengths)} />
-          <Section title="Job Gaps" items={safe(jobA.gaps)} />
+            <Block title="Missing Keywords" items={cvA.missing_keywords} />
+            <Block title="Skills to Add" items={cvA.skills_to_add} />
+            <Block title="ATS Tips" items={cvA.ats_optimization_tips} />
 
-          {/* Rewritten Letter */}
-          {coverA.rewritten_cover_letter && (
             <div style={styles.block}>
-              <h3>✉️ Rewritten Cover Letter</h3>
+              <h3>Summary Improvement</h3>
+              <p>{cvA.summary_improvement || "No data"}</p>
+            </div>
+
+            <div style={styles.block}>
+              <h3>Experience Improvements</h3>
+              {Array.isArray(cvA.experience_improvements) &&
+                cvA.experience_improvements.length > 0 ? (
+                cvA.experience_improvements.map((exp, i) => (
+                  <div key={i} style={styles.subBlock}>
+                    <p><b>Original:</b> {exp.original}</p>
+                    <p><b>Improved:</b> {exp.improved}</p>
+                  </div>
+                ))
+              ) : (
+                <p>No data</p>
+              )}
+            </div>
+
+            {/* COVER LETTER */}
+            <h2>✉️ Cover Letter</h2>
+
+            <div style={styles.block}>
+              <h3>Improved Version</h3>
               <pre style={styles.pre}>
-                {cleanText(coverA.rewritten_cover_letter)}
+                {coverA.improved_version || "No data"}
               </pre>
             </div>
-          )}
 
-          {/* RAW fallback */}
-          {raw && (
-            <div style={styles.raw}>
-              <h3>⚠️ Raw Output (Debug)</h3>
-              <pre style={styles.pre}>{raw}</pre>
+            <Block title="Key Changes" items={coverA.key_changes} />
+
+            {/* JOB ANALYSIS */}
+            <h2>💼 Job Analysis</h2>
+
+            <div style={styles.block}>
+              <p><b>Title:</b> {jobA.title}</p>
+              <p><b>Location:</b> {jobA.location}</p>
+              <p><b>Experience Level:</b> {jobA.experience_level}</p>
             </div>
-          )}
-        </div>
-      )}
+
+            <Block title="Skills Required" items={jobA.skills_required} />
+            <Block title="Responsibilities" items={jobA.key_responsibilities} />
+            <Block title="Languages" items={jobA.language_requirements} />
+            <Block title="Technologies" items={jobA.tools_technologies} />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
 /* ---------------- COMPONENT ---------------- */
 
-function Section({ title, items }) {
+function Block({ title, items = [] }) {
   return (
     <div style={styles.block}>
       <h3>{title}</h3>
-
-      {items.length > 0 ? (
-        <ul>
-          {items.map((i, idx) => (
-            <li key={idx}>{i}</li>
-          ))}
-        </ul>
-      ) : (
-        <p style={{ opacity: 0.6 }}>No data available</p>
-      )}
+      <ul>
+        {Array.isArray(items) && items.length > 0 ? (
+          items.map((i, idx) => <li key={idx}>{i}</li>)
+        ) : (
+          <li>No data</li>
+        )}
+      </ul>
     </div>
   );
 }
@@ -144,58 +181,111 @@ function Section({ title, items }) {
 
 const styles = {
   page: {
-    fontFamily: "Arial",
-    background: "#0f172a",
+    fontFamily: "Inter, Arial",
+    background: "linear-gradient(135deg, #0f172a, #020617)",
     color: "white",
     minHeight: "100vh",
-    padding: "20px",
+    padding: "40px 20px",
   },
+
+  container: {
+    maxWidth: "900px",
+    margin: "0 auto",
+  },
+
   title: {
-    fontSize: "26px",
-    marginBottom: "20px",
+    textAlign: "center",
+    fontSize: "42px",
+    marginBottom: "30px",
+    fontWeight: "600",
+    letterSpacing: "0.5px",
   },
+
   card: {
-    background: "#1e293b",
-    padding: "15px",
-    borderRadius: "10px",
+    background: "rgba(30, 41, 59, 0.9)",
+    backdropFilter: "blur(10px)",
+    padding: "20px",
+    borderRadius: "14px",
     display: "flex",
     flexDirection: "column",
-    gap: "10px",
-    maxWidth: "500px",
+    gap: "16px",
+    boxShadow: "0 10px 30px rgba(0,0,0,0.4)",
+    border: "1px solid rgba(255,255,255,0.05)",
   },
+
+  inputGroup: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "6px",
+  },
+
+  label: {
+    fontSize: "14px",
+    color: "#cbd5f5",
+    fontWeight: "500",
+  },
+
   input: {
-    padding: "10px",
-    borderRadius: "6px",
-    border: "none",
-  },
-  button: {
-    padding: "10px",
-    background: "#3b82f6",
-    border: "none",
+    padding: "8px",
+    background: "#020617",
     color: "white",
-    cursor: "pointer",
-    borderRadius: "6px",
+    border: "1px solid #334155",
+    borderRadius: "8px",
   },
-  result: {
-    marginTop: "20px",
-    background: "#111827",
-    padding: "15px",
+
+  textInput: {
+    padding: "10px",
+    background: "#020617",
+    color: "white",
+    border: "1px solid #334155",
+    borderRadius: "8px",
+    outline: "none",
+  },
+
+  button: {
+    padding: "12px",
+    background: "linear-gradient(90deg, #3b82f6, #6366f1)",
+    color: "white",
+    border: "none",
     borderRadius: "10px",
+    fontWeight: "600",
+    cursor: "pointer",
+    transition: "all 0.2s ease",
   },
+
+  dashboard: {
+    marginTop: "30px",
+    display: "flex",
+    flexDirection: "column",
+    gap: "20px",
+  },
+
   block: {
-    marginTop: "10px",
-    background: "#1f2937",
+    background: "rgba(31, 41, 55, 0.9)",
+    padding: "16px",
+    borderRadius: "12px",
+    boxShadow: "0 6px 20px rgba(0,0,0,0.3)",
+    border: "1px solid rgba(255,255,255,0.05)",
+  },
+
+  subBlock: {
+    marginBottom: "10px",
     padding: "10px",
+    background: "#020617",
     borderRadius: "8px",
   },
-  raw: {
-    marginTop: "20px",
-    background: "#7f1d1d",
-    padding: "10px",
-    borderRadius: "8px",
-  },
+
   pre: {
     whiteSpace: "pre-wrap",
-    fontSize: "12px",
+    fontSize: "13px",
+    background: "#020617",
+    padding: "12px",
+    borderRadius: "8px",
+    border: "1px solid #334155",
+  },
+
+  error: {
+    color: "#f87171",
+    fontSize: "13px",
   },
 };

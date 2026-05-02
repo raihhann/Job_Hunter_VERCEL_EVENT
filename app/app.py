@@ -1,9 +1,11 @@
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 from parsers.file_parser import parse_file
 from parsers.job_parser import parse_job_url
 from services.pipeline import run_pipeline
 
 app = Flask(__name__)
+CORS(app)
 @app.route("/api/analyze-cv", methods=["POST"])
 def analyze_cv():
     try:
