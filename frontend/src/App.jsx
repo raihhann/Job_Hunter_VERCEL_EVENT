@@ -223,6 +223,7 @@ const styles = {
     fontSize: "14px",
     color: "#cbd5f5",
     fontWeight: "500",
+    textAlign: "left"
   },
 
   input: {
